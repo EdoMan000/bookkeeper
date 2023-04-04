@@ -69,7 +69,6 @@
       <groupId>org.apache.distributedlog</groupId>
       <artifactId>distributedlog-core</artifactId>
       <version>${project.parent.version}</version>
-      <classifier>tests</classifier>
     </dependency>
 
     <!-- zookeeper -->

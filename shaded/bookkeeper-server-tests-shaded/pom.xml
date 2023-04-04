@@ -32,7 +32,6 @@
     <dependency>
       <groupId>org.apache.bookkeeper</groupId>
       <artifactId>bookkeeper-server</artifactId>
-      <type>test-jar</type>
       <version>${project.version}</version>
       <exclusions>
         <exclusion>
