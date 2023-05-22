@@ -1315,9 +1315,11 @@
 
     <!-- JaCoCo profile -->
     <profile>
-      <id>JaCoCo-coverage</id>
+      <id>JaCoCoCoverage</id>
       <activation>
-        <activeByDefault>true</activeByDefault>
+        <property>
+          <name>!skipJaCoCoCoverage</name>
+        </property>
       </activation>
       <build>
         <plugins>
