@@ -543,13 +543,6 @@
       </dependency>
 
       <dependency>
-         <!-- needed by ZooKeeper server tests utilities -->
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit5.version}</version>
-      </dependency>
-
-      <dependency>
          <!-- needed by ZooKeeper server -->
          <groupId>org.xerial.snappy</groupId>
          <artifactId>snappy-java</artifactId>
@@ -814,6 +807,15 @@
         <artifactId>hppc</artifactId>
         <version>${hppc.version}</version>
       </dependency>
+
+      <!-- https://mvnrepository.com/artifact/br.usp.each.saeg/ba-dua -->
+      <dependency>
+        <groupId>br.usp.each.saeg</groupId>
+        <artifactId>ba-dua</artifactId>
+        <version>0.8.0</version>
+        <type>pom</type>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 
