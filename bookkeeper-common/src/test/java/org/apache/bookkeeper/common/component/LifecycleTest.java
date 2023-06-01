@@ -7,9 +7,14 @@ import static org.junit.Assert.*;
 public class LifecycleTest {
 
     @Test
-    public void state() {
+    public void moveToStartedTest() {
         Lifecycle lifecycle = new Lifecycle();
-        Lifecycle lifecycle2 = new Lifecycle();
-        Assert.assertEquals(lifecycle.state(), lifecycle2.state());
+        Assert.assertTrue(lifecycle.moveToStarted());
+    }
+
+    @Test
+    public void moveToStoppedTest() {
+        Lifecycle lifecycle = new Lifecycle();
+        Assert.assertFalse(lifecycle.moveToStopped());
     }
 }
