@@ -155,6 +155,8 @@
     </plugins>
   </build>
   <profiles>
+
+    <!-- BaDua profile -->
     <profile>
       <id>BaDuaCoverage</id>
       <activation>
@@ -226,5 +228,7 @@
         </plugins>
       </build>
     </profile>
+
+
   </profiles>
 </project>

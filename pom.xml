@@ -65,7 +65,6 @@
     <module>cpu-affinity</module>
     <module>metadata-drivers</module>
     <module>bookkeeper-dist</module>
-    <module>shaded</module>
     <module>microbenchmarks</module>
     <module>bookkeeper-slogger</module>
     <module>tests</module>
