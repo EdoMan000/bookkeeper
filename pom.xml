@@ -807,14 +807,6 @@
         <version>${hppc.version}</version>
       </dependency>
 
-      <!-- https://mvnrepository.com/artifact/br.usp.each.saeg/ba-dua -->
-      <dependency>
-        <groupId>br.usp.each.saeg</groupId>
-        <artifactId>ba-dua</artifactId>
-        <version>0.8.0</version>
-        <type>pom</type>
-      </dependency>
-
     </dependencies>
   </dependencyManagement>
 
@@ -1327,7 +1319,7 @@
           <plugin>
             <groupId>org.jacoco</groupId>
             <artifactId>jacoco-maven-plugin</artifactId>
-            <version>0.8.8</version>
+            <version>0.8.10</version>
             <executions>
               <execution>
                 <id>prepare-agent</id>
