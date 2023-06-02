@@ -189,6 +189,8 @@ public class BufferedChannelTest {
     public static void cleanupOnce(){
         File newLogFileDirs = new File("testDir/BufChanReadTest");
         deleteDirectoryRecursive(newLogFileDirs);
+        File parentDirectory = new File("testDir");
+        parentDirectory.delete();
     }
     private static void deleteDirectoryRecursive(File directories) {
         if (directories.exists()) {
