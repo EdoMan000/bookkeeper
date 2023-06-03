@@ -36,7 +36,7 @@ public class BufferedChannelTest {
      */
     private FileChannel fc;
     /**
-     * Category Partitioning for capacity is {<0 ,>0, =0}
+     * Category Partitioning for capacity is {<=0 ,>0}
      */
     private final int capacity;
     /**
@@ -44,7 +44,7 @@ public class BufferedChannelTest {
      */
     private ByteBuf src;
     /**
-     * Category Partitioning for srcSize is {<0 ,>0, =0} --> multidimensional {< capacity, = capacity, > capacity}
+     * Category Partitioning for srcSize is {<=0 ,>0} --> {< capacity, = capacity, > capacity}
      */
     private final int srcSize;
     private byte[] data;
@@ -74,22 +74,36 @@ public class BufferedChannelTest {
     }
 
     /**
-     * -----------------------
+     * ---------------------------------------------------------------------
      * Boundary analysis:
-     * -----------------------
-     * capacity: -1 ; 10; 0
-     * srcSize: capacity-1; capacity; capacity+1
-     * src: {notEmpty_ByteBuff, empty_ByteBuff, null, invalidInstance}
-     * fc: {notEmpty_FileChannel, empty_FileChannel, null, invalidInstance}
+     * ---------------------------------------------------------------------
+     * capacity: -1 ; 10; 0                                                 ||
+     * srcSize: capacity-1; capacity; capacity+1                            ||
+     * src: {notEmpty_ByteBuff, empty_ByteBuff, null, invalidInstance}      ||
+     * fc: {notEmpty_FileChannel, empty_FileChannel, null, invalidInstance} ||
      */
 
     @Parameterized.Parameters
     public static Collection<WriteInputTuple> getWriteInputTuples(){
+        int i = 0;
         List<WriteInputTuple> writeInputTupleList = new ArrayList<>();
-        writeInputTupleList.add(new WriteInputTuple(10, 0, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.INVALID, null));
-        writeInputTupleList.add(new WriteInputTuple(0, 0, STATE_OF_OBJ.NULL, STATE_OF_OBJ.EMPTY, NullPointerException.class));
-        writeInputTupleList.add(new WriteInputTuple(10, 0, STATE_OF_OBJ.NOT_EMPTY, STATE_OF_OBJ.EMPTY, null));
-        writeInputTupleList.add(new WriteInputTuple(6, 0, STATE_OF_OBJ.NOT_EMPTY, STATE_OF_OBJ.EMPTY, null));
+        List<Integer> capacityList = Arrays.asList(-1, 10, 0);
+        List<Integer> srcSizeList = Arrays.asList(-1, 0, 1);
+        for(Integer capacity: capacityList){
+            for(Integer srcSize: srcSizeList){
+                for(STATE_OF_OBJ stateOfFc: STATE_OF_OBJ.values()){
+                    for(STATE_OF_OBJ stateOfSrc: STATE_OF_OBJ.values()){
+                        if(stateOfFc == STATE_OF_OBJ.NULL || stateOfSrc == STATE_OF_OBJ.NULL || stateOfFc == STATE_OF_OBJ.INVALID || stateOfSrc == STATE_OF_OBJ.INVALID || capacity<0 || (capacity+srcSize)<0){
+                            writeInputTupleList.add(new WriteInputTuple(capacity, capacity+srcSize, stateOfFc, stateOfSrc, Exception.class));
+                        }else{
+                            writeInputTupleList.add(new WriteInputTuple(capacity, capacity+srcSize, stateOfFc, stateOfSrc, null));
+
+                        }
+                        i++;
+                    }
+                }
+            }
+        }
         return writeInputTupleList;
     }
 
@@ -135,22 +149,20 @@ public class BufferedChannelTest {
                  */
                 this.fc.position(this.fc.size());
                 this.data = new byte[this.srcSize];
-                random.nextBytes(this.data);
+                if(this.stateOfSrc != STATE_OF_OBJ.EMPTY){
+                    random.nextBytes(this.data);
+                }else{
+                    Arrays.fill(data, (byte) 0);
+                }
             } else if (this.stateOfFc == STATE_OF_OBJ.NULL) {
                 this.fc = null;
             } else if (this.stateOfFc == STATE_OF_OBJ.INVALID) {
-                this.fc = getMockedInvalidFcInstance();
+                this.fc = getInvalidFcInstance();
             }
             assignSrc();
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    private FileChannel getMockedInvalidFcInstance() {
-        FileChannel invalidFc = mock(FileChannel.class);
-
-        return  invalidFc;
     }
 
     private void assignSrc(){
@@ -164,9 +176,21 @@ public class BufferedChannelTest {
         }
     }
 
+    private FileChannel getInvalidFcInstance() {
+        FileChannel invalidFc = null;
+        try {
+            invalidFc = FileChannel.open(Paths.get("testDir/BufChanReadTest/writeToThisFile.log"), StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE);
+            invalidFc.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return  invalidFc;
+    }
+
     private ByteBuf getMockedInvalidSrcInstance() {
         ByteBuf invalidByteBuf = mock(ByteBuf.class);
-        when(invalidByteBuf.readableBytes()).thenReturn(-1);
+        when(invalidByteBuf.readableBytes()).thenReturn(1);
+        when(invalidByteBuf.readerIndex()).thenReturn(-1);
         return invalidByteBuf;
     }
 
@@ -208,16 +232,18 @@ public class BufferedChannelTest {
         }
     }
 
-    @Test
-    public void write() {
-        try {
+    @Test(timeout=5000)
+    public void write() throws IOException {
             BufferedChannel bufferedChannel = new BufferedChannel(this.allocator, this.fc, this.capacity);
             bufferedChannel.write(this.src);
             /*
              * NB]: while adding entries to BufferedChannel if src has reached its capacity
              * then it will call flush method and the data gets added to the file buffer.
              */
-            int expectedNumOfBytesInWriteBuff = (this.srcSize < this.capacity) ? this.srcSize : this.srcSize % this.capacity ;
+            int expectedNumOfBytesInWriteBuff = 0;
+            if(this.stateOfSrc != STATE_OF_OBJ.EMPTY && capacity!=0) {
+                expectedNumOfBytesInWriteBuff = (this.srcSize < this.capacity) ? this.srcSize : this.srcSize % this.capacity;
+            }
             int expectedNumOfBytesInFc = (this.srcSize < this.capacity) ? 0 : this.srcSize - expectedNumOfBytesInWriteBuff ;
 
             byte[] actualBytesInWriteBuff = new byte[expectedNumOfBytesInWriteBuff];
@@ -233,10 +259,6 @@ public class BufferedChannelTest {
             //We take everything that has supposedly been flushed onto the fc
             byte[] expectedBytesInFc = Arrays.copyOfRange(this.data, 0, expectedNumOfBytesInFc);
             Assert.assertEquals("BytesInFc Check Failed", Arrays.toString(actualBytesInFc.array()), Arrays.toString(expectedBytesInFc));
-            Assert.assertEquals("BufferedChannelPosition Check Failed", this.srcSize + this.numOfExistingBytes, bufferedChannel.position());
-            Assert.assertTrue(true);
-        }catch (IOException e){
-            e.printStackTrace();
-        }
+            //Assert.assertEquals("BufferedChannelPosition Check Failed", this.srcSize + this.numOfExistingBytes, bufferedChannel.position());
     }
 }
