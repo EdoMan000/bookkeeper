@@ -1,4 +1,4 @@
-name: SonarCloud
+name: BaDuaCoverage_DataFlowCoverage
 on:
   push:
     branches:
@@ -40,4 +40,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=EdoMan000_bookkeeper
+        run: mvn clean verify -P BaDuaCoverage
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: BaDuaCoverage_Report
+          path: bookkeeper-server/target/badua.xml
+          if-no-files-found: error
