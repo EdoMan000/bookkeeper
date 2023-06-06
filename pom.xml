@@ -1310,9 +1310,7 @@
     <profile>
       <id>JaCoCoCoverage</id>
       <activation>
-        <property>
-          <name>!skipJaCoCoCoverage</name>
-        </property>
+        <activeByDefault>false</activeByDefault>
       </activation>
       <build>
         <plugins>

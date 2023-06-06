@@ -102,7 +102,8 @@ public class BufferedChannelWritingTest {
                         if(stateOfSrc == STATE_OF_OBJ.NOT_EMPTY && (stateOfFc == STATE_OF_OBJ.EMPTY || stateOfFc == STATE_OF_OBJ.NOT_EMPTY) && capacity == 0 && srcSizeCondVal == 1){
                             //this is to get the test to pass even if I know this is a buggy behaviour!
                             writeInputTupleList.add(new WriteInputTuple(capacity, srcSize, stateOfFc, stateOfSrc, TestTimedOutException.class));
-                        } else if(stateOfFc == STATE_OF_OBJ.NULL ||
+                        } else
+                        if(stateOfFc == STATE_OF_OBJ.NULL ||
                                 stateOfSrc == STATE_OF_OBJ.NULL ||
                                 stateOfFc == STATE_OF_OBJ.INVALID ||
                                 stateOfSrc == STATE_OF_OBJ.INVALID ||
