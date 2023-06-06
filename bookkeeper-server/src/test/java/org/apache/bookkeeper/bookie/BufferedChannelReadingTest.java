@@ -79,9 +79,9 @@ public class BufferedChannelReadingTest {
     }
 
     /**
-     * -------------------------------------------------------------------------------<br>
+     * -----------------------------------------------------------------------------<br>
      * Boundary analysis:                                                             <br>
-     * -------------------------------------------------------------------------------<br>
+     * -----------------------------------------------------------------------------<br>
      * capacity: -1 ; 10; 0                                                           <br>
      * startingPos: fileSize-1 ; fileSize; fileSize+1                                 <br>
      * length: fileSize-startingPos-1 ; fileSize-startingPos ; fileSize-startingPos+1 <br>
@@ -123,13 +123,53 @@ public class BufferedChannelReadingTest {
         return readInputTupleList;
     }
 
-    private record ReadInputTuple(int capacity,
-                                  int startingPos,
-                                  int length,
-                                  int fileSize,
-                                  STATE_OF_FC stateOfFc,
-                                  Class<? extends Exception> expectedException) {
-    }
+    private static final class ReadInputTuple {
+        private final int capacity;
+        private final int startingPos;
+        private final int length;
+        private final int fileSize;
+        private final STATE_OF_FC stateOfFc;
+        private final Class<? extends Exception> expectedException;
+
+        private ReadInputTuple(int capacity,
+                               int startingPos,
+                               int length,
+                               int fileSize,
+                               STATE_OF_FC stateOfFc,
+                               Class<? extends Exception> expectedException) {
+            this.capacity = capacity;
+            this.startingPos = startingPos;
+            this.length = length;
+            this.fileSize = fileSize;
+            this.stateOfFc = stateOfFc;
+            this.expectedException = expectedException;
+        }
+
+        public int capacity() {
+            return capacity;
+        }
+
+        public int startingPos() {
+            return startingPos;
+        }
+
+        public int length() {
+            return length;
+        }
+
+        public int fileSize() {
+            return fileSize;
+        }
+
+        public STATE_OF_FC stateOfFc() {
+            return stateOfFc;
+        }
+
+        public Class<? extends Exception> expectedException() {
+            return expectedException;
+        }
+
+        }
 
     @BeforeClass
     public static void setUpOnce(){

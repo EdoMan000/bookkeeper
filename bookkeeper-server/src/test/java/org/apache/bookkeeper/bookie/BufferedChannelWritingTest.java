@@ -100,7 +100,7 @@ public class BufferedChannelWritingTest {
                     for(STATE_OF_OBJ stateOfSrc : STATE_OF_OBJ.values()){
                         int srcSize = capacity + srcSizeCondVal;
                         if(stateOfSrc == STATE_OF_OBJ.NOT_EMPTY && (stateOfFc == STATE_OF_OBJ.EMPTY || stateOfFc == STATE_OF_OBJ.NOT_EMPTY) && capacity == 0 && srcSizeCondVal == 1){
-                            //this is to get the test to pass even if i know this is a buggy behaviour!
+                            //this is to get the test to pass even if I know this is a buggy behaviour!
                             writeInputTupleList.add(new WriteInputTuple(capacity, srcSize, stateOfFc, stateOfSrc, TestTimedOutException.class));
                         } else if(stateOfFc == STATE_OF_OBJ.NULL ||
                                 stateOfSrc == STATE_OF_OBJ.NULL ||
@@ -119,12 +119,46 @@ public class BufferedChannelWritingTest {
         return writeInputTupleList;
     }
 
-    private record WriteInputTuple(int capacity,
-                                   int srcSize,
-                                   STATE_OF_OBJ stateOfFc,
-                                   STATE_OF_OBJ stateOfSrc,
-                                   Class<? extends Exception> expectedException) {
-    }
+    private static final class WriteInputTuple {
+        private final int capacity;
+        private final int srcSize;
+        private final STATE_OF_OBJ stateOfFc;
+        private final STATE_OF_OBJ stateOfSrc;
+        private final Class<? extends Exception> expectedException;
+
+        private WriteInputTuple(int capacity,
+                                int srcSize,
+                                STATE_OF_OBJ stateOfFc,
+                                STATE_OF_OBJ stateOfSrc,
+                                Class<? extends Exception> expectedException) {
+            this.capacity = capacity;
+            this.srcSize = srcSize;
+            this.stateOfFc = stateOfFc;
+            this.stateOfSrc = stateOfSrc;
+            this.expectedException = expectedException;
+        }
+
+        public int capacity() {
+            return capacity;
+        }
+
+        public int srcSize() {
+            return srcSize;
+        }
+
+        public STATE_OF_OBJ stateOfFc() {
+            return stateOfFc;
+        }
+
+        public STATE_OF_OBJ stateOfSrc() {
+            return stateOfSrc;
+        }
+
+        public Class<? extends Exception> expectedException() {
+            return expectedException;
+        }
+
+        }
 
     @BeforeClass
     public static void setUpOnce(){
@@ -254,8 +288,8 @@ public class BufferedChannelWritingTest {
      * 129] capacity = 0 | srcSize = 1 | fc = EMPTY | src = NOT_EMPTY  <br>
      * 133] capacity = 0 | srcSize = 1 | fc = NOT_EMPTY | src = NOT_EMPTY <br>
      * --------------------------------------------------------------------<br>
-     * it seems you can create a 0 capacity channel so when it tries tu flush the content
-     * it fails, and then it tries again and again until the test times out
+     * it seems you can create a 0 capacity channel so when it tries tu flush the content it
+     * fails, and then it tries again and again until the test times out without giving any exception
      */
     @Test(timeout = 5000)
     public void write() throws IOException {
