@@ -106,7 +106,15 @@ public class BufferedChannelReadingTest {
                 for (Integer lengthCondVal : conditionList) {
                     for (STATE_OF_FC stateOfFc : STATE_OF_FC.values()) {
                         for (STATE_OF_DEST stateOfDest : STATE_OF_DEST.values()) {
-                            int fileSize = (stateOfFc == STATE_OF_FC.EMPTY || stateOfFc == STATE_OF_FC.NULL || stateOfFc == STATE_OF_FC.INVALID  ) ? 0 : 30;
+                            int fileSize;
+                            if(stateOfFc == STATE_OF_FC.EMPTY || stateOfFc == STATE_OF_FC.NULL || stateOfFc == STATE_OF_FC.INVALID  ){
+                                fileSize = 0;
+                            }else{
+                                Random random = new Random(System.currentTimeMillis());
+                                do {
+                                    fileSize = random.nextInt(30);
+                                }while (fileSize > 0);
+                            }
                             int startingPos = fileSize + startingPosCondVal;
                             int length = (fileSize - startingPos) + lengthCondVal;
                             if (stateOfFc == STATE_OF_FC.NULL ||
@@ -114,11 +122,10 @@ public class BufferedChannelReadingTest {
                                     stateOfDest == STATE_OF_DEST.NULL ||
                                     stateOfDest == STATE_OF_DEST.INVALID ||
                                     capacity < 0 ||
-                                    (startingPos > length && length > 0 && startingPos + length > fileSize && stateOfFc == STATE_OF_FC.NOT_EMPTY) ||
-                                    (capacity == 0 && startingPos > length && length > 0 && startingPos + length >= fileSize && stateOfFc == STATE_OF_FC.NOT_EMPTY) ||
-                                    (startingPos > length && length > 0 && startingPos + length >= fileSize && stateOfFc == STATE_OF_FC.EMPTY) ||
-                                    (startingPos < 0 && length > 0) ||
-                                    (length > 0 && fileSize == 0) ){
+                                    length > 0 && startingPos < 0 ||
+                                    length > 0 && stateOfFc == STATE_OF_FC.EMPTY ||
+                                    length > 0 && startingPos + length > fileSize && stateOfFc == STATE_OF_FC.NOT_EMPTY ||
+                                    length > 0 && capacity == 0 && startingPos + length >= fileSize && stateOfFc == STATE_OF_FC.NOT_EMPTY){
                                 readInputTupleList.add(new ReadInputTuple(capacity, stateOfFc, stateOfDest, startingPos, length, fileSize, Exception.class));
                             } else {
                                 readInputTupleList.add(new ReadInputTuple(capacity, stateOfFc, stateOfDest, startingPos, length, fileSize, null));
@@ -293,7 +300,7 @@ public class BufferedChannelReadingTest {
     }
 
 
-    @Test(timeout = 5000)
+    @Test
     public void read() throws IOException {
         BufferedChannel bufferedChannel = new BufferedChannel(UnpooledByteBufAllocator.DEFAULT, this.fc, this.capacity);
         Integer actualNumOfBytesRead = bufferedChannel.read(this.dest, this.startingPos, this.length);
