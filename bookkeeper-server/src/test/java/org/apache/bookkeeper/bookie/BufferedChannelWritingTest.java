@@ -99,10 +99,10 @@ public class BufferedChannelWritingTest {
                 for(STATE_OF_OBJ stateOfFc : STATE_OF_OBJ.values()){
                     for(STATE_OF_OBJ stateOfSrc : STATE_OF_OBJ.values()){
                         int srcSize = capacity + srcSizeCondVal;
-                        if(stateOfSrc == STATE_OF_OBJ.NOT_EMPTY && (stateOfFc == STATE_OF_OBJ.EMPTY || stateOfFc == STATE_OF_OBJ.NOT_EMPTY) && capacity == 0 && srcSizeCondVal == 1){
+                        //if(stateOfSrc == STATE_OF_OBJ.NOT_EMPTY && (stateOfFc == STATE_OF_OBJ.EMPTY || stateOfFc == STATE_OF_OBJ.NOT_EMPTY) && capacity == 0 && srcSizeCondVal == 1){
                             //this is to get the test to pass even if I know this is a buggy behaviour!
-                            writeInputTupleList.add(new WriteInputTuple(capacity, srcSize, stateOfFc, stateOfSrc, TestTimedOutException.class));
-                        } else
+                            //writeInputTupleList.add(new WriteInputTuple(capacity, srcSize, stateOfFc, stateOfSrc, TestTimedOutException.class));
+                        //} else
                         if(stateOfFc == STATE_OF_OBJ.NULL ||
                                 stateOfSrc == STATE_OF_OBJ.NULL ||
                                 stateOfFc == STATE_OF_OBJ.INVALID ||
@@ -177,7 +177,7 @@ public class BufferedChannelWritingTest {
     @Before
     public void setUpEachTime(){
         try {
-            Random random = new Random();
+            Random random = new Random(System.currentTimeMillis());
             if (this.stateOfFc == STATE_OF_OBJ.NOT_EMPTY || this.stateOfFc == STATE_OF_OBJ.EMPTY) {
                 if(this.stateOfFc == STATE_OF_OBJ.NOT_EMPTY) {
                     try (FileOutputStream fileOutputStream = new FileOutputStream("testDir/BufChanWriteTest/writeToThisFile.log")) {

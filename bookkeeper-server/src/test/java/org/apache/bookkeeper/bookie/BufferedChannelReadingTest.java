@@ -189,7 +189,7 @@ public class BufferedChannelReadingTest {
         try {
             if (this.stateOfFc == STATE_OF_FC.NOT_EMPTY || this.stateOfFc == STATE_OF_FC.EMPTY) {
                 if(this.stateOfFc == STATE_OF_FC.NOT_EMPTY) {
-                    Random random = new Random();
+                    Random random = new Random(System.currentTimeMillis());
                     try (FileOutputStream fileOutputStream = new FileOutputStream("testDir/BufChanReadTest/readFromThisFile.log")) {
                         if(this.fileSize > 0) {
                             this.bytesInFileToBeRead = new byte[this.fileSize];
