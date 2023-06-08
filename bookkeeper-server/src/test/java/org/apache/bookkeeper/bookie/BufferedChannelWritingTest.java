@@ -39,7 +39,7 @@ public class BufferedChannelWritingTest {
     private FileChannel fc;
     /**
      * Category Partitioning for capacity is:<br>
-     * {<0, >0 ,=0}
+     * {<=0, >0}
      */
     private final int capacity;
     /**

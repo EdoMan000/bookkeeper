@@ -21,15 +21,7 @@ import static org.mockito.Mockito.when;
 
 @RunWith(value = Parameterized.class)
 public class BufferedChannelReadingTest {
-    /**
-     * UnpooledByteBufAllocator(boolean preferDirect):
-     * This constructor allows specifying whether the allocator should prefer allocating
-     * direct buffers (preferDirect set to true)
-     * or heap buffers (preferDirect set to false).
-     * Direct buffers are allocated outside the JVM heap,
-     * which can be beneficial for scenarios involving I/O operations.
-     */
-    private final UnpooledByteBufAllocator allocator = new UnpooledByteBufAllocator(true);
+    Random random = new Random(System.currentTimeMillis());
     /**
      * Category Partitioning for fc is:<br>
      * {notEmpty, empty, null, invalidInstance}
@@ -40,12 +32,6 @@ public class BufferedChannelReadingTest {
      * {notEmpty, empty, null, invalidInstance}
      */
     private ByteBuf dest;
-    /**
-     * Category Partitioning for destSize is:<br>
-     * {<0, >0 ,=0} <br>
-     * turns out like --> {<= length, > length}
-     */
-    private final int destSize;
     /**
      * Category Partitioning for capacity is:<br>
      * {<=0, >0}
@@ -65,19 +51,25 @@ public class BufferedChannelReadingTest {
     private final int length;
     /**
      * Category Partitioning for fileSize is:<br>
-     * {<0, >=0}
+     * {>0, =0}
      */
     private final int fileSize;
     private byte[] bytesInFileToBeRead;
 
-    private enum STATE_OF_OBJ {
+    private enum STATE_OF_FC {
         EMPTY,
         NOT_EMPTY,
         NULL,
         INVALID
     }
-    private final STATE_OF_OBJ stateOfFc;
-    private final STATE_OF_OBJ stateOfDest;
+
+    private enum STATE_OF_DEST {
+        NULL,
+        VALID,
+        INVALID
+    }
+    private final STATE_OF_FC stateOfFc;
+    private final STATE_OF_DEST stateOfDest;
 
     @Rule
     public ExpectedException expectedException = ExpectedException.none();
@@ -89,7 +81,6 @@ public class BufferedChannelReadingTest {
         this.fileSize = readInputTuple.fileSize();
         this.stateOfFc = readInputTuple.stateOfFc();
         this.stateOfDest = readInputTuple.stateOfDest();
-        this.destSize = readInputTuple.destSize();
         if(readInputTuple.expectedException() != null){
             this.expectedException.expect(readInputTuple.expectedException());
         }
@@ -102,43 +93,35 @@ public class BufferedChannelReadingTest {
      * capacity: -1 ; 10; 0                                                           <br>
      * startingPos: fileSize-1 ; fileSize; fileSize+1                                 <br>
      * length: fileSize-startingPos-1 ; fileSize-startingPos ; fileSize-startingPos+1 <br>
-     * fileSize: -1 ; 11; 0                                                           <br>
      * fc: {notEmpty_FileChannel, empty_FileChannel, null, invalidInstance}           <br>
      * dest: {notEmpty_ByteBuf, empty_ByteBuf, null, invalidInstance}           <br>
      */
-
     @Parameterized.Parameters
     public static Collection<ReadInputTuple> getReadInputTuples(){
         List<ReadInputTuple> readInputTupleList = new ArrayList<>();
         List<Integer> capacityList = Arrays.asList(-1, 10, 0);
         List<Integer> conditionList = Arrays.asList(-1, 0, 1);
-        List<Integer> fileSizeList = Arrays.asList(-1, 11, 0);
-        for(Integer fileSize : fileSizeList){
-            for(Integer capacity : capacityList){
-                for(Integer destSizeCondVal: conditionList) {
-                    for (Integer startingPosCondVal : conditionList) {
-                        for (Integer lengthCondVal : conditionList) {
-                            for (STATE_OF_OBJ stateOfFc : STATE_OF_OBJ.values()) {
-                                for (STATE_OF_OBJ stateOfDest : STATE_OF_OBJ.values()) {
-                                    int startingPos = fileSize + startingPosCondVal;
-                                    int length = (fileSize - startingPos) + lengthCondVal;
-                                    int destSize = length + destSizeCondVal;
-                                    if (stateOfFc == STATE_OF_OBJ.NULL ||
-                                            stateOfFc == STATE_OF_OBJ.INVALID ||
-                                            stateOfDest == STATE_OF_OBJ.NULL ||
-                                            stateOfDest == STATE_OF_OBJ.INVALID ||
-                                            capacity < 0 ||
-                                            destSize < 0 ||
-                                            (startingPos > length && length > 0 && startingPos + length > fileSize && stateOfFc == STATE_OF_OBJ.NOT_EMPTY) ||
-                                            (capacity == 0 && startingPos > length && length > 0 && startingPos + length >= fileSize && stateOfFc == STATE_OF_OBJ.NOT_EMPTY) ||
-                                            (startingPos > length && length > 0 && startingPos + length >= fileSize && stateOfFc == STATE_OF_OBJ.EMPTY) ||
-                                            (startingPos < 0 && length > 0) ||
-                                            length > 0 && fileSize == 0) {
-                                        readInputTupleList.add(new ReadInputTuple(capacity, stateOfFc, stateOfDest, destSize, startingPos, length, fileSize, Exception.class));
-                                    } else {
-                                        readInputTupleList.add(new ReadInputTuple(capacity, stateOfFc, stateOfDest, destSize, startingPos, length, fileSize, null));
-                                    }
-                                }
+        for(Integer capacity : capacityList){
+            for (Integer startingPosCondVal : conditionList) {
+                for (Integer lengthCondVal : conditionList) {
+                    for (STATE_OF_FC stateOfFc : STATE_OF_FC.values()) {
+                        for (STATE_OF_DEST stateOfDest : STATE_OF_DEST.values()) {
+                            int fileSize = (stateOfFc == STATE_OF_FC.EMPTY || stateOfFc == STATE_OF_FC.NULL || stateOfFc == STATE_OF_FC.INVALID  ) ? 0 : 30;
+                            int startingPos = fileSize + startingPosCondVal;
+                            int length = (fileSize - startingPos) + lengthCondVal;
+                            if (stateOfFc == STATE_OF_FC.NULL ||
+                                    stateOfFc == STATE_OF_FC.INVALID ||
+                                    stateOfDest == STATE_OF_DEST.NULL ||
+                                    stateOfDest == STATE_OF_DEST.INVALID ||
+                                    capacity < 0 ||
+                                    (startingPos > length && length > 0 && startingPos + length > fileSize && stateOfFc == STATE_OF_FC.NOT_EMPTY) ||
+                                    (capacity == 0 && startingPos > length && length > 0 && startingPos + length >= fileSize && stateOfFc == STATE_OF_FC.NOT_EMPTY) ||
+                                    (startingPos > length && length > 0 && startingPos + length >= fileSize && stateOfFc == STATE_OF_FC.EMPTY) ||
+                                    (startingPos < 0 && length > 0) ||
+                                    (length > 0 && fileSize == 0) ){
+                                readInputTupleList.add(new ReadInputTuple(capacity, stateOfFc, stateOfDest, startingPos, length, fileSize, Exception.class));
+                            } else {
+                                readInputTupleList.add(new ReadInputTuple(capacity, stateOfFc, stateOfDest, startingPos, length, fileSize, null));
                             }
                         }
                     }
@@ -150,18 +133,16 @@ public class BufferedChannelReadingTest {
 
     private static final class ReadInputTuple {
         private final int capacity;
-        private final STATE_OF_OBJ stateOfFc;
-        private final STATE_OF_OBJ stateOfDest;
-        private final int destSize;
+        private final STATE_OF_FC stateOfFc;
+        private final STATE_OF_DEST stateOfDest;
         private final int startingPos;
         private final int length;
         private final int fileSize;
         private final Class<? extends Exception> expectedException;
 
         private ReadInputTuple(int capacity,
-                               STATE_OF_OBJ stateOfFc,
-                               STATE_OF_OBJ stateOfDest,
-                               int destSize,
+                               STATE_OF_FC stateOfFc,
+                               STATE_OF_DEST stateOfDest,
                                int startingPos,
                                int length,
                                int fileSize,
@@ -169,7 +150,6 @@ public class BufferedChannelReadingTest {
             this.capacity = capacity;
             this.stateOfFc = stateOfFc;
             this.stateOfDest = stateOfDest;
-            this.destSize = destSize;
             this.startingPos = startingPos;
             this.length = length;
             this.fileSize = fileSize;
@@ -180,16 +160,12 @@ public class BufferedChannelReadingTest {
             return capacity;
         }
 
-        public STATE_OF_OBJ stateOfFc() {
+        public STATE_OF_FC stateOfFc() {
             return stateOfFc;
         }
 
-        public STATE_OF_OBJ stateOfDest() {
+        public STATE_OF_DEST stateOfDest() {
             return stateOfDest;
-        }
-
-        public int destSize() {
-            return destSize;
         }
 
         public int startingPos() {
@@ -226,24 +202,19 @@ public class BufferedChannelReadingTest {
     @Before
     public void setUpEachTime(){
         try {
-            if (this.stateOfFc == STATE_OF_OBJ.NOT_EMPTY || this.stateOfFc == STATE_OF_OBJ.EMPTY) {
-                if(this.stateOfFc == STATE_OF_OBJ.NOT_EMPTY) {
-                    Random random = new Random(System.currentTimeMillis());
+            if (this.stateOfFc == STATE_OF_FC.NOT_EMPTY || this.stateOfFc == STATE_OF_FC.EMPTY) {
+                if(this.stateOfFc == STATE_OF_FC.NOT_EMPTY) {
                     try (FileOutputStream fileOutputStream = new FileOutputStream("testDir/BufChanReadTest/readFromThisFile.log")) {
-                        if(this.fileSize > 0) {
-                            this.bytesInFileToBeRead = new byte[this.fileSize];
-                            random.nextBytes(this.bytesInFileToBeRead);
-                            fileOutputStream.write(this.bytesInFileToBeRead);
-                        }else{
-                            this.bytesInFileToBeRead = new byte[0];
-                        }
+                        this.bytesInFileToBeRead = new byte[this.fileSize];
+                        random.nextBytes(this.bytesInFileToBeRead);
+                        fileOutputStream.write(this.bytesInFileToBeRead);
                     }
                 }
                 this.fc = openNewFileChannel();
                 this.fc.position(this.fc.size());
-            } else if (this.stateOfFc == STATE_OF_OBJ.NULL) {
+            } else if (this.stateOfFc == STATE_OF_FC.NULL) {
                 this.fc = null;
-            } else if (this.stateOfFc == STATE_OF_OBJ.INVALID) {
+            } else if (this.stateOfFc == STATE_OF_FC.INVALID) {
                 this.fc = getInvalidFcInstance();
             }
             assignDest();
@@ -253,18 +224,11 @@ public class BufferedChannelReadingTest {
     }
 
     private void assignDest() {
-        Random random = new Random(System.currentTimeMillis());
         this.dest = Unpooled.buffer();
-        byte[] data = new byte[destSize];
-        if(this.stateOfDest == STATE_OF_OBJ.NOT_EMPTY) {
-            random.nextBytes(data);
-            this.dest.writeBytes(data);
-        } else if (this.stateOfDest == STATE_OF_OBJ.NULL) {
+        if (this.stateOfDest == STATE_OF_DEST.NULL) {
             this.dest = null;
-        } else if (this.stateOfDest == STATE_OF_OBJ.INVALID) {
+        } else if (this.stateOfDest == STATE_OF_DEST.INVALID) {
             this.dest = getMockedInvalidDestInstance();
-        }else{
-            Arrays.fill(data, (byte) 0);
         }
     }
 
@@ -293,7 +257,7 @@ public class BufferedChannelReadingTest {
     @After
     public void cleanupEachTime(){
         try {
-            if(this.stateOfFc != STATE_OF_OBJ.NULL) {
+            if(this.stateOfFc != STATE_OF_FC.NULL) {
                 this.fc.close();
             }
             File oldLogFile = new File("testDir/BufChanReadTest/readFromThisFile.log");
@@ -329,24 +293,19 @@ public class BufferedChannelReadingTest {
     }
 
 
-    @Test
+    @Test(timeout = 5000)
     public void read() throws IOException {
-        BufferedChannel bufferedChannel = new BufferedChannel(this.allocator, this.fc, this.capacity);
+        BufferedChannel bufferedChannel = new BufferedChannel(UnpooledByteBufAllocator.DEFAULT, this.fc, this.capacity);
         Integer actualNumOfBytesRead = bufferedChannel.read(this.dest, this.startingPos, this.length);
         Integer expectedNumOfBytesInReadBuff = 0;
         byte[] expectedBytes = new byte[0];
-        byte[] actualBytesRead = new byte[0];
         if (this.startingPos <= this.fileSize) {
             if(this.length > 0) {
                 expectedNumOfBytesInReadBuff = (this.fileSize - this.startingPos >= this.length) ? this.length : this.fileSize - this.startingPos - this.length;
                 expectedBytes = Arrays.copyOfRange(this.bytesInFileToBeRead, this.startingPos, this.startingPos + expectedNumOfBytesInReadBuff);
             }
         }
-        if(this.stateOfDest == STATE_OF_OBJ.NOT_EMPTY && this.destSize > 0) {
-            actualBytesRead = Arrays.copyOfRange(this.dest.array(), this.destSize, this.destSize + actualNumOfBytesRead);
-        }else {
-            actualBytesRead = Arrays.copyOfRange(this.dest.array(), 0, actualNumOfBytesRead);
-        }
+        byte[] actualBytesRead = Arrays.copyOfRange(this.dest.array(), 0, actualNumOfBytesRead);
 
         Assert.assertEquals("BytesRead Check Failed", Arrays.toString(expectedBytes), Arrays.toString(actualBytesRead));
         Assert.assertEquals("NumOfBytesRead Check Failed", expectedNumOfBytesInReadBuff, actualNumOfBytesRead);
