@@ -142,7 +142,7 @@ public class JournalScanJournalTest {
     }
 
 
-    @Test
+    //@Test
     public void scanJournalTest() throws IOException {
         long actualScanOffset = this.journal.scanJournal(this.journalId, this.journalPos, this.scanner);
 

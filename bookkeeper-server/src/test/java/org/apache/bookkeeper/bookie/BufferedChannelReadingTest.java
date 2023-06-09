@@ -17,12 +17,12 @@ import java.nio.file.StandardOpenOption;
 import java.util.*;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyByte;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @RunWith(value = Parameterized.class)
 public class BufferedChannelReadingTest {
+    public static final Class<? extends Exception> SUCCESS = null;
     Random random = new Random(System.currentTimeMillis());
     /**
      * Category Partitioning for fc is:<br>
@@ -57,6 +57,7 @@ public class BufferedChannelReadingTest {
      */
     private final int fileSize;
     private byte[] bytesInFileToBeRead;
+    private boolean writingBeforeReading;
 
     private enum STATE_OF_FC {
         EMPTY,
@@ -83,6 +84,7 @@ public class BufferedChannelReadingTest {
         this.fileSize = readInputTuple.fileSize();
         this.stateOfFc = readInputTuple.stateOfFc();
         this.stateOfDest = readInputTuple.stateOfDest();
+        this.writingBeforeReading = readInputTuple.writingBeforeReading();
         if(readInputTuple.expectedException() != null){
             this.expectedException.expect(readInputTuple.expectedException());
         }
@@ -93,11 +95,37 @@ public class BufferedChannelReadingTest {
      * Boundary analysis:                                                             <br>
      * -----------------------------------------------------------------------------<br>
      * capacity: -1 ; 10; 0                                                           <br>
-     * startingPos: fileSize-1 ; fileSize; fileSize+1                                 <br>
-     * length: fileSize-startingPos-1 ; fileSize-startingPos ; fileSize-startingPos+1 <br>
      * fc: {notEmpty_FileChannel, empty_FileChannel, null, invalidInstance}           <br>
      * dest: {null, validInstance, invalidInstance}                                   <br>
+     * startingPos: 0 ; fileSize; fileSize+1                                 <br>
+     * length: fileSize-startingPos-1 ; fileSize-startingPos ; fileSize-startingPos+1 <br>
      */
+
+    @Parameterized.Parameters
+    public static Collection<ReadInputTuple> getReadInputTuples() {
+        List<ReadInputTuple> readInputTupleList = new ArrayList<>();
+        //==================================CAPACITY====STATE_OF_FC===== STATE_OF_DEST====STARTING_POS=LENGTH=FILESIZE===EXPECTED
+        readInputTupleList.add(new ReadInputTuple(-1, STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.VALID, 0, 11, 12, false, Exception.class));      //[1] fault of capacity < 0
+        readInputTupleList.add(new ReadInputTuple(10, STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.VALID, 0, 11, 12, false, SUCCESS));              //[2] FOUND BUG -> it reads 12 even if i selected 11
+        readInputTupleList.add(new ReadInputTuple(0, STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.VALID, 0, 11, 12, false, Exception.class));       //[3] fault of capacity = 0
+        readInputTupleList.add(new ReadInputTuple(10, STATE_OF_FC.NULL, STATE_OF_DEST.VALID, 0, 11, 12, false, Exception.class));           //[4] fault of STATE_OF_FC.NULL
+        readInputTupleList.add(new ReadInputTuple(10, STATE_OF_FC.INVALID, STATE_OF_DEST.VALID, 0, 11, 12, false, Exception.class));        //[5] fault of STATE_OF_FC.INVALID
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 0, 0, 0, false, SUCCESS));                   //[6] SUCCESS
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 0, 1, 0, false, Exception.class));           //[7] fault of length = fileSize-startingPos+1 -> trying to Read empty file
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.NULL, 0, 11, 12, false, Exception.class));      //[8] fault of STATE_OF_DEST.NULL
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.INVALID, 0, 11, 12, false, Exception.class));   //[9] fault of STATE_OF_DEST.INVALID
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.VALID, 12, 11, 12, false, Exception.class));    //[10] fault of startingPos = fileSize and then trying to read length > 0 bytes
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.VALID, 13, 11, 12, false, Exception.class));    //[11] fault of startingPos = fileSize + 1
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.VALID, 0, 12, 12, false, SUCCESS));             //[12] SUCCESS
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.VALID, 0, 13, 12, false, Exception.class));     //[13] fault of length = fileSize - startingPos + 1 being more than the full content of the file
+
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 0, 1, 0, true, SUCCESS));                    //[14] SUCCESS even if length > fileSize -> data will be read from writeBuff FOUND BUG -> it still reads more than needed
+
+        return readInputTupleList;
+    }
+
+
+    /*
     @Parameterized.Parameters
     public static Collection<ReadInputTuple> getReadInputTuples(){
         List<ReadInputTuple> readInputTupleList = new ArrayList<>();
@@ -137,6 +165,7 @@ public class BufferedChannelReadingTest {
         }
         return readInputTupleList;
     }
+     */
 
     private static final class ReadInputTuple {
         private final int capacity;
@@ -145,6 +174,7 @@ public class BufferedChannelReadingTest {
         private final int startingPos;
         private final int length;
         private final int fileSize;
+        private final boolean writingBeforeReading;
         private final Class<? extends Exception> expectedException;
 
         private ReadInputTuple(int capacity,
@@ -153,6 +183,7 @@ public class BufferedChannelReadingTest {
                                int startingPos,
                                int length,
                                int fileSize,
+                               boolean writingBeforeReading,
                                Class<? extends Exception> expectedException) {
             this.capacity = capacity;
             this.stateOfFc = stateOfFc;
@@ -160,6 +191,7 @@ public class BufferedChannelReadingTest {
             this.startingPos = startingPos;
             this.length = length;
             this.fileSize = fileSize;
+            this.writingBeforeReading = writingBeforeReading;
             this.expectedException = expectedException;
         }
 
@@ -187,11 +219,14 @@ public class BufferedChannelReadingTest {
             return fileSize;
         }
 
+        public boolean writingBeforeReading() {
+            return writingBeforeReading;
+        }
+
         public Class<? extends Exception> expectedException() {
             return expectedException;
         }
-
-        }
+    }
 
     @BeforeClass
     public static void setUpOnce(){
@@ -216,6 +251,9 @@ public class BufferedChannelReadingTest {
                         random.nextBytes(this.bytesInFileToBeRead);
                         fileOutputStream.write(this.bytesInFileToBeRead);
                     }
+                }else if (this.writingBeforeReading){
+                    this.bytesInFileToBeRead = new byte[this.length + 1];
+                    random.nextBytes(this.bytesInFileToBeRead);
                 }
                 this.fc = openNewFileChannel();
                 this.fc.position(this.fc.size());
@@ -304,13 +342,23 @@ public class BufferedChannelReadingTest {
     public void read() throws IOException {
         Assert.assertEquals("FileSize Check Failed", this.fc.size(), this.fileSize); // just to make sure
         BufferedChannel bufferedChannel = new BufferedChannel(UnpooledByteBufAllocator.DEFAULT, this.fc, this.capacity);
+        if(this.writingBeforeReading){
+            ByteBuf tempByteBuf = Unpooled.buffer();
+            tempByteBuf.writeBytes(this.bytesInFileToBeRead);
+            bufferedChannel.write(tempByteBuf);
+        }
         Integer actualNumOfBytesRead = bufferedChannel.read(this.dest, this.startingPos, this.length);
         Integer expectedNumOfBytesInReadBuff = 0;
         byte[] expectedBytes = new byte[0];
         if (this.startingPos <= this.fc.size()) {
             if(this.length > 0) {
-                expectedNumOfBytesInReadBuff = Math.toIntExact((this.fc.size() - this.startingPos >= this.length) ? this.length : this.fc.size() - this.startingPos - this.length);
-                expectedBytes = Arrays.copyOfRange(this.bytesInFileToBeRead, this.startingPos, this.startingPos + expectedNumOfBytesInReadBuff);
+                if(writingBeforeReading){
+                    expectedNumOfBytesInReadBuff = Math.toIntExact((this.length+1 - this.startingPos >= this.length) ? this.length : this.length+1 - this.startingPos - this.length);
+                    expectedBytes = Arrays.copyOfRange(this.bytesInFileToBeRead, this.startingPos, this.startingPos + expectedNumOfBytesInReadBuff);
+                }else {
+                    expectedNumOfBytesInReadBuff = Math.toIntExact((this.fc.size() - this.startingPos >= this.length) ? this.length : this.fc.size() - this.startingPos - this.length);
+                    expectedBytes = Arrays.copyOfRange(this.bytesInFileToBeRead, this.startingPos, this.startingPos + expectedNumOfBytesInReadBuff);
+                }
             }
         }
         byte[] actualBytesRead = new byte[0];
