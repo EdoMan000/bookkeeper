@@ -7,7 +7,6 @@ import org.junit.*;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.junit.runners.model.TestTimedOutException;
 
 import java.io.File;
 import java.io.FileOutputStream;

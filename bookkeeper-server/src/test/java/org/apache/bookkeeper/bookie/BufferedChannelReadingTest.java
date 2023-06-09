@@ -16,6 +16,8 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyByte;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,7 +31,7 @@ public class BufferedChannelReadingTest {
     private FileChannel fc;
     /**
      * Category Partitioning for dest is:<br>
-     * {notEmpty, empty, null, invalidInstance}
+     * {null, validInstance, invalidInstance}
      */
     private ByteBuf dest;
     /**
@@ -94,7 +96,7 @@ public class BufferedChannelReadingTest {
      * startingPos: fileSize-1 ; fileSize; fileSize+1                                 <br>
      * length: fileSize-startingPos-1 ; fileSize-startingPos ; fileSize-startingPos+1 <br>
      * fc: {notEmpty_FileChannel, empty_FileChannel, null, invalidInstance}           <br>
-     * dest: {notEmpty_ByteBuf, empty_ByteBuf, null, invalidInstance}           <br>
+     * dest: {null, validInstance, invalidInstance}                                   <br>
      */
     @Parameterized.Parameters
     public static Collection<ReadInputTuple> getReadInputTuples(){
@@ -106,21 +108,19 @@ public class BufferedChannelReadingTest {
                 for (Integer lengthCondVal : conditionList) {
                     for (STATE_OF_FC stateOfFc : STATE_OF_FC.values()) {
                         for (STATE_OF_DEST stateOfDest : STATE_OF_DEST.values()) {
-                            int fileSize;
-                            if(stateOfFc == STATE_OF_FC.EMPTY || stateOfFc == STATE_OF_FC.NULL || stateOfFc == STATE_OF_FC.INVALID  ){
-                                fileSize = 0;
-                            }else{
+                            int fileSize = 0;
+                            if(stateOfFc == STATE_OF_FC.NOT_EMPTY){
                                 Random random = new Random(System.currentTimeMillis());
                                 do {
                                     fileSize = random.nextInt(30);
-                                }while (fileSize > 0);
+                                }while (fileSize == 0);
                             }
                             int startingPos = fileSize + startingPosCondVal;
                             int length = (fileSize - startingPos) + lengthCondVal;
                             if (stateOfFc == STATE_OF_FC.NULL ||
                                     stateOfFc == STATE_OF_FC.INVALID ||
-                                    stateOfDest == STATE_OF_DEST.NULL ||
-                                    stateOfDest == STATE_OF_DEST.INVALID ||
+                                    length > 0 && stateOfDest == STATE_OF_DEST.NULL ||
+                                    length > 0 && stateOfDest == STATE_OF_DEST.INVALID ||
                                     capacity < 0 ||
                                     length > 0 && startingPos < 0 ||
                                     length > 0 && stateOfFc == STATE_OF_FC.EMPTY ||
@@ -242,7 +242,7 @@ public class BufferedChannelReadingTest {
     private ByteBuf getMockedInvalidDestInstance() {
         ByteBuf invalidByteBuf = mock(ByteBuf.class);
         when(invalidByteBuf.writableBytes()).thenReturn(1);
-        when(invalidByteBuf.writerIndex()).thenReturn(-1);
+        when(invalidByteBuf.writeBytes(any(ByteBuf.class), any(int.class), any(int.class) )).thenThrow(new IndexOutOfBoundsException("Hi, i'm an invalid instance!"));
         return invalidByteBuf;
     }
 
@@ -302,17 +302,21 @@ public class BufferedChannelReadingTest {
 
     @Test
     public void read() throws IOException {
+        Assert.assertEquals("FileSize Check Failed", this.fc.size(), this.fileSize); // just to make sure
         BufferedChannel bufferedChannel = new BufferedChannel(UnpooledByteBufAllocator.DEFAULT, this.fc, this.capacity);
         Integer actualNumOfBytesRead = bufferedChannel.read(this.dest, this.startingPos, this.length);
         Integer expectedNumOfBytesInReadBuff = 0;
         byte[] expectedBytes = new byte[0];
-        if (this.startingPos <= this.fileSize) {
+        if (this.startingPos <= this.fc.size()) {
             if(this.length > 0) {
-                expectedNumOfBytesInReadBuff = (this.fileSize - this.startingPos >= this.length) ? this.length : this.fileSize - this.startingPos - this.length;
+                expectedNumOfBytesInReadBuff = Math.toIntExact((this.fc.size() - this.startingPos >= this.length) ? this.length : this.fc.size() - this.startingPos - this.length);
                 expectedBytes = Arrays.copyOfRange(this.bytesInFileToBeRead, this.startingPos, this.startingPos + expectedNumOfBytesInReadBuff);
             }
         }
-        byte[] actualBytesRead = Arrays.copyOfRange(this.dest.array(), 0, actualNumOfBytesRead);
+        byte[] actualBytesRead = new byte[0];
+        if(this.stateOfDest == STATE_OF_DEST.VALID) {
+            actualBytesRead = Arrays.copyOfRange(this.dest.array(), 0, actualNumOfBytesRead);
+        }
 
         Assert.assertEquals("BytesRead Check Failed", Arrays.toString(expectedBytes), Arrays.toString(actualBytesRead));
         Assert.assertEquals("NumOfBytesRead Check Failed", expectedNumOfBytesInReadBuff, actualNumOfBytesRead);
