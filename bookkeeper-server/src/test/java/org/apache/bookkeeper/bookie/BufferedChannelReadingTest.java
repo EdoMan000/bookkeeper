@@ -57,7 +57,7 @@ public class BufferedChannelReadingTest {
      */
     private final int fileSize;
     private byte[] bytesInFileToBeRead;
-    private boolean writingBeforeReading;
+    private final boolean writingBeforeReading;
 
     private enum STATE_OF_FC {
         EMPTY,
@@ -118,8 +118,15 @@ public class BufferedChannelReadingTest {
         readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.VALID, 13, 11, 12, false, Exception.class));    //[11] fault of startingPos = fileSize + 1
         readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.VALID, 0, 12, 12, false, SUCCESS));             //[12] SUCCESS
         readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.NOT_EMPTY, STATE_OF_DEST.VALID, 0, 13, 12, false, Exception.class));     //[13] fault of length = fileSize - startingPos + 1 being more than the full content of the file
-
-        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 0, 1, 0, true, SUCCESS));                    //[14] SUCCESS even if length > fileSize -> data will be read from writeBuff FOUND BUG -> it still reads more than needed
+        //AFTER JACOCO REPORT
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 0, 1, 2, true, SUCCESS));                    //[14] SUCCESS even if length > fileSize -> data will be read from writeBuff FOUND BUG -> it still reads more than needed
+        //AFTER PIT REPORT
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 0, 1, 0, true, Exception.class));            //[15] fault of (like [7] but writeBeforeRead)
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 12, 11, 12, true, Exception.class));         //[16] fault of (like [10] but writeBeforeRead)
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 13, 11, 12, true, Exception.class));         //[17] fault of (like [11] but writeBeforeRead)
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 0, 13, 12, true, Exception.class));          //[18] fault of (like [13] but writeBeforeRead) <--------
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 0, 0, 0, true, SUCCESS));                    //[19] SUCCESS (like [6] but writeBeforeRead)
+        readInputTupleList.add(new ReadInputTuple(10,  STATE_OF_FC.EMPTY, STATE_OF_DEST.VALID, 0, 12, 12, true, SUCCESS));                  //[20] SUCCESS (like [12] but writeBeforeRead)
 
         return readInputTupleList;
     }
@@ -245,15 +252,12 @@ public class BufferedChannelReadingTest {
     public void setUpEachTime(){
         try {
             if (this.stateOfFc == STATE_OF_FC.NOT_EMPTY || this.stateOfFc == STATE_OF_FC.EMPTY) {
+                this.bytesInFileToBeRead = new byte[this.fileSize];
+                random.nextBytes(this.bytesInFileToBeRead);
                 if(this.stateOfFc == STATE_OF_FC.NOT_EMPTY) {
                     try (FileOutputStream fileOutputStream = new FileOutputStream("testDir/BufChanReadTest/readFromThisFile.log")) {
-                        this.bytesInFileToBeRead = new byte[this.fileSize];
-                        random.nextBytes(this.bytesInFileToBeRead);
                         fileOutputStream.write(this.bytesInFileToBeRead);
                     }
-                }else if (this.writingBeforeReading){
-                    this.bytesInFileToBeRead = new byte[this.length + 1];
-                    random.nextBytes(this.bytesInFileToBeRead);
                 }
                 this.fc = openNewFileChannel();
                 this.fc.position(this.fc.size());
@@ -340,7 +344,6 @@ public class BufferedChannelReadingTest {
 
     @Test
     public void read() throws IOException {
-        Assert.assertEquals("FileSize Check Failed", this.fc.size(), this.fileSize); // just to make sure
         BufferedChannel bufferedChannel = new BufferedChannel(UnpooledByteBufAllocator.DEFAULT, this.fc, this.capacity);
         if(this.writingBeforeReading){
             ByteBuf tempByteBuf = Unpooled.buffer();
