@@ -381,12 +381,12 @@
             <version>${pitest.version}</version>
             <configuration>
               <targetClasses>
-                <!-- param>org.apache.bookkeeper.bookie.BufferedChannel</param -->
+                <param>org.apache.bookkeeper.bookie.BufferedChannel</param>
                 <param>org.apache.bookkeeper.bookie.Journal</param>
               </targetClasses>
               <targetTests>
-                <!-- param>org.apache.bookkeeper.bookie.BufferedChannelWritingTest</param -->
-                <!-- param>org.apache.bookkeeper.bookie.BufferedChannelReadingTest</param -->
+                <param>org.apache.bookkeeper.bookie.BufferedChannelWritingTest</param>
+                <param>org.apache.bookkeeper.bookie.BufferedChannelReadingTest</param>
                 <param>org.apache.bookkeeper.bookie.JournalScanningJournalTest</param>
               </targetTests>
               <avoidCallsTo>
@@ -416,7 +416,7 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <ba-dua.version>0.8.1-SNAPSHOT</ba-dua.version>
+        <ba-dua.version>0.6.0</ba-dua.version>
         <argLine>-javaagent:target/dependency/ba-dua-agent-rt-${ba-dua.version}-all.jar -Doutput.file=${project.build.directory}/badua.ser</argLine>
       </properties>
       <dependencies>

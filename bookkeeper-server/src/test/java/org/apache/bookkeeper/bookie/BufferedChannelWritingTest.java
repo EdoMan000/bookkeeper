@@ -328,7 +328,7 @@ public class BufferedChannelWritingTest {
         }
     }
 
-    //@Test(timeout = 5000)
+    @Test(timeout = 5000)
     public void write() throws IOException {
             BufferedChannel bufferedChannel = new BufferedChannel(this.allocator, this.fc, this.capacity, this.unpersistedBytesBound);
             bufferedChannel.write(this.src);
