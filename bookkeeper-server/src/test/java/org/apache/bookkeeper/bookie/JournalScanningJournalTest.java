@@ -17,7 +17,8 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 @RunWith(value = Parameterized.class)
-public class JournalScanJournalTest {
+public class JournalScanningJournalTest {
+    public static final Class<? extends Exception> SUCCESS = null;
     /**
      * Category Partitioning for journalId is:<br>
      * {<0, >=0}
@@ -39,6 +40,7 @@ public class JournalScanJournalTest {
     private Journal journal;
     private final STATE_OF_SCANNER stateOfScanner;
     private final STATE_OF_JOURNAL_ID stateOfJournalId;
+    private final boolean journalV5Version;
 
     private enum STATE_OF_SCANNER {
         NULL,
@@ -53,12 +55,13 @@ public class JournalScanJournalTest {
 
     @Rule
     public ExpectedException expectedException = ExpectedException.none();
-    private static final Logger LOG = LoggerFactory.getLogger(JournalScanJournalTest.class);
+    private static final Logger LOG = LoggerFactory.getLogger(JournalScanningJournalTest.class);
 
-    public JournalScanJournalTest(InputTuple inputTuple) {
+    public JournalScanningJournalTest(InputTuple inputTuple) {
         this.stateOfJournalId = inputTuple.stateOfJournalId();
         this.journalPos = inputTuple.journalPos();
         this.stateOfScanner = inputTuple.stateOfScanner();
+        this.journalV5Version = inputTuple.journalV5Version();
         if(inputTuple.expectedException() != null){
             this.expectedException.expect(inputTuple.expectedException());
         }
@@ -69,14 +72,17 @@ public class JournalScanJournalTest {
         private final long journalPos;
         private final STATE_OF_SCANNER stateOfScanner;
         private final Class<? extends Exception> expectedException;
+        private boolean journalV5Version;
 
         private InputTuple(STATE_OF_JOURNAL_ID stateOfJournalId,
                            long journalPos,
                            STATE_OF_SCANNER stateOfScanner,
+                           boolean journalV5Version,
                            Class<? extends Exception> expectedException) {
             this.journalPos = journalPos;
             this.stateOfScanner = stateOfScanner;
             this.stateOfJournalId = stateOfJournalId;
+            this.journalV5Version = journalV5Version;
             this.expectedException = expectedException;
         }
 
@@ -95,6 +101,10 @@ public class JournalScanJournalTest {
         public Class<? extends Exception> expectedException() {
             return expectedException;
         }
+
+        public boolean journalV5Version() {
+            return journalV5Version;
+        }
     }
 
     @Before
@@ -106,8 +116,13 @@ public class JournalScanJournalTest {
         BookieImpl.checkDirectoryStructure(BookieImpl.getCurrentDirectory(journalDir));
         File ledgerDir = createTempDir("bookie", "ledger");
         BookieImpl.checkDirectoryStructure(BookieImpl.getCurrentDirectory(ledgerDir));
-        JournalV4Writer.writeV4Journal(BookieImpl.getCurrentDirectory(journalDir), 100,
-                "Hey, This is a test!".getBytes());
+        if(this.journalV5Version){
+            JournalWriter.writeV5Journal(BookieImpl.getCurrentDirectory(journalDir), 2 * JournalChannel.SECTOR_SIZE,
+                    "Hey, This is a test V5!".getBytes());
+        }else {
+            JournalWriter.writeV4Journal(BookieImpl.getCurrentDirectory(journalDir), 100,
+                    "Hey, This is a test V4!".getBytes());
+        }
 
         ServerConfiguration conf = TestBKConfiguration.newServerConfiguration();
         conf.setJournalDirName(journalDir.getPath())
@@ -141,16 +156,39 @@ public class JournalScanJournalTest {
         tempDirs.clear();
     }
 
-
-    //@Test
-    public void scanJournalTest() throws IOException {
-        long actualScanOffset = this.journal.scanJournal(this.journalId, this.journalPos, this.scanner);
-
-        Assert.assertTrue("ScanOffsetCheck Failed", actualScanOffset > 0);
-
-
+    /**
+     * -----------------------------------------------------------------------------<br>
+     * Boundary analysis:                                                             <br>
+     * -----------------------------------------------------------------------------<br>
+     * journalId: correctJournalId; incorrectJournalId                             <br>
+     * journalPos: -1; 10; 0                                                       <br>
+     * scanner: {null, validInstance, invalidInstance}                             <br>
+     */
+    @Parameterized.Parameters
+    public static Collection<InputTuple> getInputTuples() {
+        List<InputTuple> inputTupleList = new ArrayList<>();
+        //inputTupleList.add(new InputTuple(stateOfJournalId, journalPos, stateOfScanner, JournalV5, EXPECTED));==================//
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.VALID, false, SUCCESS));             // [1] SUCCESS
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.INVALID, false, Exception.class));  // [2] fault of STATE_OF_SCANNER==INVALID
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.NULL, false, Exception.class));    // [3] fault of STATE_OF_SCANNER==NULL
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.INCORRECT, 10, STATE_OF_SCANNER.VALID, false, SUCCESS));        // [4] No Exception -> still scans something for some reason (black boxing it)
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, -1, STATE_OF_SCANNER.VALID, false, SUCCESS));         // [5] No Exception -> journalPos <= 0 doesn't throw exception
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 0, STATE_OF_SCANNER.VALID, false, SUCCESS));         // [6] No Exception -> journalPos <= 0 doesn't throw exception
+                                                                                                                           //
+        //AFTER JACOCO REPORT -> JOURNAL V5                                                                               //
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.VALID, true, SUCCESS));      // [7] SUCCESS
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.INVALID, true, SUCCESS));   // [8] No Exception ->  fault of STATE_OF_SCANNER==INVALID is not bothering because there is padding record and it is not processed
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.NULL, true, SUCCESS));     // [9] No Exception ->  fault of STATE_OF_SCANNER==NULL is not bothering because there is padding record and it is not processed
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.INCORRECT, 10, STATE_OF_SCANNER.VALID, true, SUCCESS)); // [10] No Exception -> still scans something for some reason (black boxing it)
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, -1, STATE_OF_SCANNER.VALID, true, SUCCESS));  // [11] No Exception -> journalPos <= 0 doesn't throw exception
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 0, STATE_OF_SCANNER.VALID, true, SUCCESS));  // [12] No Exception -> journalPos <= 0 doesn't throw exception
+        return  inputTupleList;                                                                                    //
     }
 
+
+
+
+    /*
     @Parameterized.Parameters
     public static Collection<InputTuple> getInputTuples() {
         List<Long> journalPosList = Arrays.asList((long)-1, (long)10, (long)0);
@@ -171,6 +209,17 @@ public class JournalScanJournalTest {
             }
         }
         return  inputTupleList;
+    }
+
+     */
+
+    //@Test
+    public void scanJournalTest() throws IOException {
+        long actualScanOffset = this.journal.scanJournal(this.journalId, this.journalPos, this.scanner);
+
+        Assert.assertTrue("ScanOffsetCheck Failed", actualScanOffset > 0);
+
+
     }
 
     private static class ValidScanner implements Journal.JournalScanner{

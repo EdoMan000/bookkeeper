@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 
 @RunWith(value = Parameterized.class)
 public class BufferedChannelWritingTest {
+    public static final Class<? extends Exception> SUCCESS = null;
     /**
      * UnpooledByteBufAllocator(boolean preferDirect):
      * This constructor allows specifying whether the allocator should prefer allocating
@@ -54,6 +55,7 @@ public class BufferedChannelWritingTest {
     private final int srcSize;
     private byte[] data;
     private int numOfExistingBytes;
+    private long unpersistedBytesBound;
 
     private enum STATE_OF_OBJ {
         EMPTY,
@@ -72,6 +74,7 @@ public class BufferedChannelWritingTest {
         this.stateOfFc = writeInputTuple.stateOfFc();
         this.stateOfSrc = writeInputTuple.stateOfSrc();
         this.srcSize = writeInputTuple.srcSize();
+        this.unpersistedBytesBound = writeInputTuple.unpersistedBytesBound();
         this.numOfExistingBytes = 0;
         if(writeInputTuple.expectedException() != null){
             this.expectedException.expect(writeInputTuple.expectedException());
@@ -83,11 +86,46 @@ public class BufferedChannelWritingTest {
      * Boundary analysis:<br>
      * ---------------------------------------------------------------------<br>
      * capacity: -1 ; 10; 0                                                 <br>
-     * srcSize: capacity-1; capacity; capacity+1                            <br>
-     * src: {notEmpty_ByteBuff, empty_ByteBuff, null, invalidInstance}      <br>
+     *
+     * src:  {notEmpty_ByteBuff && src.size() < capacity, <br>
+     *      notEmpty_ByteBuff && src.size() => capacity, <br>
+     *      empty_ByteBuff, null, invalidInstance} <br>
+     *
      * fc: {notEmpty_FileChannel, empty_FileChannel, null, invalidInstance} <br>
      */
+    @Parameterized.Parameters
+    public static Collection<WriteInputTuple> getWriteInputTuples() {
+        List<WriteInputTuple> writeInputTupleList = new ArrayList<>();
+        //writeInputTupleList.add(new WriteInputTuple(capacity, srcSize, stateOfFc, stateOfSrc, EXPECTED));==================//
+        writeInputTupleList.add(new WriteInputTuple(-1, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, Exception.class));    //[1] fault of capacity < 0
+        writeInputTupleList.add(new WriteInputTuple(0, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, Exception.class));     //[2] fault of capacity == 0 --> FOUND BUG (No errors thrown but infinite cycle: the test passes only because of a TimeoutException is thrown)
+        writeInputTupleList.add(new WriteInputTuple(0, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, SUCCESS));             //[3] ON PURPOSE TO MANIFEST THE BUG
+        writeInputTupleList.add(new WriteInputTuple(10, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, SUCCESS));            //[4] SUCCESS
+        writeInputTupleList.add(new WriteInputTuple(10, 10, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, SUCCESS));           //[5] SUCCESS
+        writeInputTupleList.add(new WriteInputTuple(10, 15, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, SUCCESS));           //[6] SUCCESS
+        writeInputTupleList.add(new WriteInputTuple(10, 0, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.EMPTY, 0L, SUCCESS));                //[7] SUCCESS
+        writeInputTupleList.add(new WriteInputTuple(0, 0, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.EMPTY, 0L, SUCCESS));                 //[8] SUCCESS <-- even if capacity == 0 we are not writing anything, so it doesn't try to flush anything on fc
+        writeInputTupleList.add(new WriteInputTuple(10, 0, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NULL, 0L, Exception.class));         //[9] fault of stateOfSrc == NULL
+        writeInputTupleList.add(new WriteInputTuple(10, 0, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.INVALID, 0L, Exception.class));      //[10] fault of stateOfSrc == INVALID
+        writeInputTupleList.add(new WriteInputTuple(10, 15, STATE_OF_OBJ.NOT_EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, SUCCESS));       //[11] SUCCESS
+        writeInputTupleList.add(new WriteInputTuple(10, 15, STATE_OF_OBJ.NULL, STATE_OF_OBJ.NOT_EMPTY, 0L, Exception.class));    //[12] fault of stateOfFc == NULL
+        writeInputTupleList.add(new WriteInputTuple(10, 15, STATE_OF_OBJ.INVALID, STATE_OF_OBJ.NOT_EMPTY, 0L, Exception.class)); //[13] fault of stateOfFc == INVALID
+        //AFTER JACOCO REPORT:
 
+        return writeInputTupleList;
+    }
+
+
+    /**
+     * NB]: test case 129 and 133 go in an infinite loop <br>
+     * --------------------------------------------------------------------<br>
+     * 129] capacity = 0 | srcSize = 1 | fc = EMPTY | src = NOT_EMPTY  <br>
+     * 133] capacity = 0 | srcSize = 1 | fc = NOT_EMPTY | src = NOT_EMPTY <br>
+     * --------------------------------------------------------------------<br>
+     * it seems you can create a 0 capacity channel so when it tries tu flush the content it
+     * fails, and then it tries again and again until the test times out without giving any exception
+     */
+    /*
     @Parameterized.Parameters
     public static Collection<WriteInputTuple> getWriteInputTuples(){
         List<WriteInputTuple> writeInputTupleList = new ArrayList<>();
@@ -115,22 +153,27 @@ public class BufferedChannelWritingTest {
         return writeInputTupleList;
     }
 
+     */
+
     private static final class WriteInputTuple {
         private final int capacity;
         private final int srcSize;
         private final STATE_OF_OBJ stateOfFc;
         private final STATE_OF_OBJ stateOfSrc;
         private final Class<? extends Exception> expectedException;
+        private final long unpersistedBytesBound;
 
         private WriteInputTuple(int capacity,
                                 int srcSize,
                                 STATE_OF_OBJ stateOfFc,
                                 STATE_OF_OBJ stateOfSrc,
+                                long unpersistedBytesBound,
                                 Class<? extends Exception> expectedException) {
             this.capacity = capacity;
             this.srcSize = srcSize;
             this.stateOfFc = stateOfFc;
             this.stateOfSrc = stateOfSrc;
+            this.unpersistedBytesBound = unpersistedBytesBound;
             this.expectedException = expectedException;
         }
 
@@ -154,7 +197,10 @@ public class BufferedChannelWritingTest {
             return expectedException;
         }
 
+        public long unpersistedBytesBound() {
+            return unpersistedBytesBound;
         }
+    }
 
     @BeforeClass
     public static void setUpOnce(){
@@ -208,7 +254,7 @@ public class BufferedChannelWritingTest {
     }
 
     private void assignSrc(){
-        this.src = Unpooled.directBuffer();
+        this.src = Unpooled.directBuffer(this.srcSize);
         if(this.stateOfSrc == STATE_OF_OBJ.NOT_EMPTY) {
             this.src.writeBytes(this.data);
         } else if (this.stateOfSrc == STATE_OF_OBJ.NULL) {
@@ -278,19 +324,9 @@ public class BufferedChannelWritingTest {
         }
     }
 
-    /**
-     * NB]: test case 129 and 133 go in an infinite loop <br>
-     * --------------------------------------------------------------------<br>
-     * 129] capacity = 0 | srcSize = 1 | fc = EMPTY | src = NOT_EMPTY  <br>
-     * 133] capacity = 0 | srcSize = 1 | fc = NOT_EMPTY | src = NOT_EMPTY <br>
-     * --------------------------------------------------------------------<br>
-     * it seems you can create a 0 capacity channel so when it tries tu flush the content it
-     * fails, and then it tries again and again until the test times out without giving any exception
-     */
-
-    //@Test(timeout = 5000)
+    @Test(timeout = 5000)
     public void write() throws IOException {
-            BufferedChannel bufferedChannel = new BufferedChannel(this.allocator, this.fc, this.capacity);
+            BufferedChannel bufferedChannel = new BufferedChannel(this.allocator, this.fc, this.capacity, this.unpersistedBytesBound);
             bufferedChannel.write(this.src);
             /*
              * NB]: while adding entries to BufferedChannel if src has reached its capacity
