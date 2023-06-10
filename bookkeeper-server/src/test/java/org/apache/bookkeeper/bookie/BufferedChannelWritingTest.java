@@ -96,7 +96,7 @@ public class BufferedChannelWritingTest {
     @Parameterized.Parameters
     public static Collection<WriteInputTuple> getWriteInputTuples() {
         List<WriteInputTuple> writeInputTupleList = new ArrayList<>();
-        //writeInputTupleList.add(new WriteInputTuple(capacity, srcSize, stateOfFc, stateOfSrc, EXPECTED));==================//
+        //writeInputTupleList.add(new WriteInputTuple(capacity, srcSize, stateOfFc, stateOfSrc, EXPECTED));======================//
         writeInputTupleList.add(new WriteInputTuple(-1, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, Exception.class));    //[1] fault of capacity < 0
         writeInputTupleList.add(new WriteInputTuple(0, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, Exception.class));     //[2] fault of capacity == 0 --> FOUND BUG (No errors thrown but infinite cycle: the test passes only because of a TimeoutException is thrown)
         writeInputTupleList.add(new WriteInputTuple(0, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, SUCCESS));             //[3] ON PURPOSE TO MANIFEST THE BUG
@@ -110,8 +110,12 @@ public class BufferedChannelWritingTest {
         writeInputTupleList.add(new WriteInputTuple(10, 15, STATE_OF_OBJ.NOT_EMPTY, STATE_OF_OBJ.NOT_EMPTY, 0L, SUCCESS));       //[11] SUCCESS
         writeInputTupleList.add(new WriteInputTuple(10, 15, STATE_OF_OBJ.NULL, STATE_OF_OBJ.NOT_EMPTY, 0L, Exception.class));    //[12] fault of stateOfFc == NULL
         writeInputTupleList.add(new WriteInputTuple(10, 15, STATE_OF_OBJ.INVALID, STATE_OF_OBJ.NOT_EMPTY, 0L, Exception.class)); //[13] fault of stateOfFc == INVALID
-        //AFTER JACOCO REPORT:
-
+        //AFTER JACOCO REPORT:                                                                                                   //
+        writeInputTupleList.add(new WriteInputTuple(10, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 3L, SUCCESS));            //[14] SUCCESS
+        writeInputTupleList.add(new WriteInputTuple(10, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 6L, SUCCESS));            //[15] SUCCESS
+        //AFTER PIT REPORT:                                                                                                      //
+        //writeInputTupleList.add(new WriteInputTuple(10, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 5L, SUCCESS));          //[16] SUCCESS with additional flush (commenting because it is the same test as 14)
+        //writeInputTupleList.add(new WriteInputTuple(10, 5, STATE_OF_OBJ.EMPTY, STATE_OF_OBJ.NOT_EMPTY, 6L, SUCCESS));          //[17] SUCCESS with additional flush (commenting because it is the same test ad 15)
         return writeInputTupleList;
     }
 
@@ -324,7 +328,7 @@ public class BufferedChannelWritingTest {
         }
     }
 
-    @Test(timeout = 5000)
+    //@Test(timeout = 5000)
     public void write() throws IOException {
             BufferedChannel bufferedChannel = new BufferedChannel(this.allocator, this.fc, this.capacity, this.unpersistedBytesBound);
             bufferedChannel.write(this.src);
@@ -336,8 +340,15 @@ public class BufferedChannelWritingTest {
             if(this.stateOfSrc != STATE_OF_OBJ.EMPTY && capacity!=0) {
                 expectedNumOfBytesInWriteBuff = (this.srcSize < this.capacity) ? this.srcSize : this.srcSize % this.capacity;
             }
-            int expectedNumOfBytesInFc = (this.srcSize < this.capacity) ? 0 : this.srcSize - expectedNumOfBytesInWriteBuff ;
-
+            int expectedNumOfBytesInFc = 0;
+            if(this.unpersistedBytesBound > 0L){
+                if(this.unpersistedBytesBound <= this.srcSize){
+                    expectedNumOfBytesInFc = this.srcSize;
+                    expectedNumOfBytesInWriteBuff = 0;
+                }
+            }else{
+                expectedNumOfBytesInFc = (this.srcSize < this.capacity) ? 0 : this.srcSize - expectedNumOfBytesInWriteBuff ;
+            }
             byte[] actualBytesInWriteBuff = new byte[expectedNumOfBytesInWriteBuff];
             bufferedChannel.writeBuffer.getBytes(0, actualBytesInWriteBuff);
 

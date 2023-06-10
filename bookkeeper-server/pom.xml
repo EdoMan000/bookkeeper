@@ -381,13 +381,13 @@
             <version>${pitest.version}</version>
             <configuration>
               <targetClasses>
-                <param>org.apache.bookkeeper.bookie.BufferedChannel</param>
-                <!-- param>org.apache.bookkeeper.bookie.Journal</param -->
+                <!-- param>org.apache.bookkeeper.bookie.BufferedChannel</param -->
+                <param>org.apache.bookkeeper.bookie.Journal</param>
               </targetClasses>
               <targetTests>
-                <param>org.apache.bookkeeper.bookie.BufferedChannelWritingTest</param>
+                <!-- param>org.apache.bookkeeper.bookie.BufferedChannelWritingTest</param -->
                 <!-- param>org.apache.bookkeeper.bookie.BufferedChannelReadingTest</param -->
-                <!-- param>org.apache.bookkeeper.bookie.JournalScanningJournalTest</param -->
+                <param>org.apache.bookkeeper.bookie.JournalScanningJournalTest</param>
               </targetTests>
               <avoidCallsTo>
                 <avoidCallsTo>org.slf4j</avoidCallsTo>
