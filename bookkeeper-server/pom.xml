@@ -265,14 +265,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-surefire-plugin.version}</version>
-        <configuration>
-          <!-- THIS IS TO IGNORE THE FAILURES GIVEN FROM THE BUG-->
-          <testFailureIgnore>true</testFailureIgnore>
-          <!-- THIS IS TO VERIFY LOG CALLS (needed in JournalCheckpointCompletingTest to increase mutation coverage)-->
-          <classpathDependencyExcludes>
-            <classpathDependencyExcludes>ch.qos.logback:logback-classic</classpathDependencyExcludes>
-          </classpathDependencyExcludes>
-        </configuration>
         <!-- configuration>
           <trimStackTrace>false</trimStackTrace>
           <properties>
@@ -391,7 +383,7 @@
               <targetTests>
                 <!-- param>org.apache.bookkeeper.bookie.BufferedChannelWritingTest</param -->
                 <!-- param>org.apache.bookkeeper.bookie.BufferedChannelReadingTest</param -->
-                <!-- param>org.apache.bookkeeper.bookie.JournalScanningJournalTest</param -->
+                <param>org.apache.bookkeeper.bookie.JournalScanningJournalTest</param>
                 <param>org.apache.bookkeeper.bookie.JournalCheckpointCompletingTest</param>
               </targetTests>
               <avoidCallsTo>
