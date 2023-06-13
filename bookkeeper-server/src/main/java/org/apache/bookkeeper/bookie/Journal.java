@@ -68,8 +68,7 @@ import org.slf4j.LoggerFactory;
  * Provide journal related management.
  */
 public class Journal extends BookieCriticalThread implements CheckpointSource {
-
-    private static final Logger LOG = LoggerFactory.getLogger(Journal.class);
+    private static Logger LOG = LoggerFactory.getLogger(Journal.class);
 
     private static final RecyclableArrayList.Recycler<QueueEntry> entryListRecycler =
         new RecyclableArrayList.Recycler<QueueEntry>();

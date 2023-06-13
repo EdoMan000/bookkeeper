@@ -1325,6 +1325,17 @@
                   <goal>prepare-agent</goal>
                 </goals>
               </execution>
+              <!-- execution>
+                <id>prepare-agent-integration</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>prepare-agent-integration</goal>
+                </goals>
+                <configuration>
+                  <append>true</append>
+                  <destFile>target/tests/...</destFile>
+                </configuration>
+              </execution -->
             </executions>
           </plugin>
         </plugins>

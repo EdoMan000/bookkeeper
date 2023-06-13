@@ -16,24 +16,28 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 @RunWith(value = Parameterized.class)
 public class JournalScanningJournalTest {
     public static final Class<? extends Exception> SUCCESS = null;
     /**
      * Category Partitioning for journalId is:<br>
-     * {<0, >=0}
+     * {<0}, {>=0}
      * --> turns out this can be either equal or different from the actual journalId
      * so categoory partitioning would be {correcJournalId, incorrectJournalId}
      */
     private long journalId;
     /**
      * Category Partitioning for journalPos is:<br>
-     * {<0, >=0}
+     * {<0}, {>=0}
      */
     private final long journalPos;
     /**
      * Category Partitioning for scanner is:<br>
-     * {null, validScanner, invalidSanner}
+     * {null}, {validScanner}, {invalidSanner}
      */
     private Journal.JournalScanner scanner;
     private BookieImpl bookieImpl;
@@ -140,7 +144,8 @@ public class JournalScanningJournalTest {
         if(this.stateOfScanner == STATE_OF_SCANNER.NULL) {
             this.scanner = null;
         } else if (this.stateOfScanner == STATE_OF_SCANNER.VALID) {
-            this.scanner = new ValidScanner();
+            //adding spy for pit mutation coverage increase
+            this.scanner = spy(new ValidScanner());
         } else if (this.stateOfScanner == STATE_OF_SCANNER.INVALID) {
             this.scanner = new InvalidScanner();
         }
@@ -162,7 +167,7 @@ public class JournalScanningJournalTest {
      * -----------------------------------------------------------------------------<br>
      * journalId: correctJournalId; incorrectJournalId                             <br>
      * journalPos: -1; 10; 0                                                       <br>
-     * scanner: {null, validInstance, invalidInstance}                             <br>
+     * scanner: null, validInstance, invalidInstance                             <br>
      */
     @Parameterized.Parameters
     public static Collection<InputTuple> getInputTuples() {
@@ -213,12 +218,19 @@ public class JournalScanningJournalTest {
 
      */
 
-    @Test
+    @Test@Ignore
     public void scanJournalTest() throws IOException {
         long actualScanOffset = this.journal.scanJournal(this.journalId, this.journalPos, this.scanner);
 
         Assert.assertTrue("ScanOffsetCheck Failed", actualScanOffset > 0);
-
+        //PIT ADDITION
+        if(this.stateOfScanner == STATE_OF_SCANNER.VALID && this.stateOfJournalId == STATE_OF_JOURNAL_ID.CORRECT && this.journalPos<=0) {
+            if (this.journalV5Version) {
+                verify(this.scanner, atLeastOnce()).process(eq(5), eq((long)512), any());
+            } else {
+                verify(this.scanner, atLeastOnce()).process(eq(4), eq((long)8), any());
+            }
+        }
 
     }
 

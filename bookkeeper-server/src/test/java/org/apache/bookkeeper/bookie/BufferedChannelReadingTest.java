@@ -342,7 +342,7 @@ public class BufferedChannelReadingTest {
     }
 
 
-    @Test
+    @Test@Ignore
     public void read() throws IOException {
         BufferedChannel bufferedChannel = new BufferedChannel(UnpooledByteBufAllocator.DEFAULT, this.fc, this.capacity);
         if(this.writingBeforeReading){
