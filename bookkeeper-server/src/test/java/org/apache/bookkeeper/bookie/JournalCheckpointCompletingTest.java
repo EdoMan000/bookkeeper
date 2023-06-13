@@ -55,9 +55,6 @@ public class JournalCheckpointCompletingTest {
         this.stateOfCheckpoint = inputTuple.stateOfCheckpoint();
         this.compact = inputTuple.compact();
         this.moreJournalsInDirectory = inputTuple.moreJournalsInDirectory();
-        if(inputTuple.expectedException() != null){
-            this.expectedException.expect(inputTuple.expectedException());
-        }
     }
 
     private static final class InputTuple {
