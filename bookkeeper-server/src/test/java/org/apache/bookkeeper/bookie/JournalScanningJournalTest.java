@@ -182,8 +182,8 @@ public class JournalScanningJournalTest {
                                                                                                                            //
         //AFTER JACOCO REPORT -> JOURNAL V5                                                                               //
         inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.VALID, true, SUCCESS));      // [7] SUCCESS
-        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.INVALID, true, SUCCESS));   // [8] No Exception ->  fault of STATE_OF_SCANNER==INVALID is not bothering because there is padding record and it is not processed
-        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.NULL, true, SUCCESS));     // [9] No Exception ->  fault of STATE_OF_SCANNER==NULL is not bothering because there is padding record and it is not processed
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.INVALID, true, SUCCESS));   // [8] No Exception ->  fault of STATE_OF_SCANNER==INVALID is not bothering because there is no processing
+        inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 10, STATE_OF_SCANNER.NULL, true, SUCCESS));     // [9] No Exception ->  fault of STATE_OF_SCANNER==NULL is not bothering because there is no processing
         inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.INCORRECT, 10, STATE_OF_SCANNER.VALID, true, SUCCESS)); // [10] No Exception -> still scans something for some reason (black boxing it)
         inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, -1, STATE_OF_SCANNER.VALID, true, SUCCESS));  // [11] No Exception -> journalPos <= 0 doesn't throw exception
         inputTupleList.add(new InputTuple(STATE_OF_JOURNAL_ID.CORRECT, 0, STATE_OF_SCANNER.VALID, true, SUCCESS));  // [12] No Exception -> journalPos <= 0 doesn't throw exception
@@ -218,7 +218,7 @@ public class JournalScanningJournalTest {
 
      */
 
-    @Test
+    @Test//@Ignore
     public void scanJournalTest() throws IOException {
         long actualScanOffset = this.journal.scanJournal(this.journalId, this.journalPos, this.scanner);
 

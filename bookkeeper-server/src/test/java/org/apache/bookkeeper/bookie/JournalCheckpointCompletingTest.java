@@ -4,10 +4,7 @@ import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.conf.TestBKConfiguration;
 import org.apache.bookkeeper.util.IOUtils;
 import org.apache.commons.io.FileUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -115,8 +112,6 @@ public class JournalCheckpointCompletingTest {
                 break;
         }
         if(this.moreJournalsInDirectory){
-            //BookieImpl newBookieImpl;
-            //Journal addedJournal;
             for (int i = 1; i <= 10; i++) {
                 JournalWriter.writeV4Journal(BookieImpl.getCurrentDirectory(journalDir), 100,
                         "Hey, This is a test!".getBytes());
@@ -161,7 +156,7 @@ public class JournalCheckpointCompletingTest {
         return  inputTupleList;
     }
 
-    @Test
+    @Test//@Ignore
     public void checkpointComplete() throws IOException, NoSuchFieldException, IllegalAccessException {
         //ADDITION AFTER PIT REPORT
         if(this.stateOfCheckpoint == STATE_OF_CHECKPOINT.VALID && this.compact && this.moreJournalsInDirectory){
